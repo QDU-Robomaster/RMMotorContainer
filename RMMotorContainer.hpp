@@ -179,7 +179,7 @@ public:
       }
     }
 
-    float GetCurrent() {
+    float GetCurrentMAX() {
       switch (this->param_.model) {
         case Model::MOTOR_M2006:
           return M2006_MAX_ABS_CUR;
@@ -210,6 +210,24 @@ public:
           return 0.0f;
       }
     }
+
+    float GetSpeed() {
+      if (param_.reverse) {
+        return -this->feedback_.rotor_rotation_speed;
+      } else {
+        return this->feedback_.rotor_abs_angle;
+      }
+    }
+
+    float GetCurrent() {
+      if (param_.reverse) {
+        return -this->feedback_.torque_current;
+      } else {
+        return this->feedback_.torque_current;
+      }
+    }
+
+    float GetTemp() { return this->feedback_.temp; }
 
     /**
      * @brief 设置电机的电流控制指令
