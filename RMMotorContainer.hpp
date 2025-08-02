@@ -379,54 +379,56 @@ public:
     for (const auto param : std::initializer_list<Param*>{
              &param_0, &param_1, &param_2, &param_3, &param_4, &param_5,
              &param_6, &param_7, &param_8, &param_9, &param_10}) {
-      RMMotor::ConfigParam config;
-      motors_[index] = new RMMotor(this,*param,config);
-      config.id_feedback = M3508_M2006_FB_ID_BASE + index;
-      switch (param->model) {
-        case Model::MOTOR_M2006:
-        case Model::MOTOR_M3508:
-          if (index <= 3) {
-            config.id_control = M3508_M2006_CTRL_ID_BASE;
-            motors_[index]->num_ = config.id_feedback - M3508_M2006_FB_ID_BASE;
-          }
-          else if (index >= 4 && index <= 7) {
-            config.id_control = M3508_M2006_CTRL_ID_EXTAND;
-            motors_[index]->num_ = config.id_feedback - M3508_M2006_FB_ID_EXTAND;
-          }
-          break;
-        case Model::MOTOR_GM6020:
-          if (index >= 4 && index <= 7) {
-            config.id_control = GM6020_CTRL_ID_BASE;
-                motors_[index]->num_ = config.id_feedback - GM6020_FB_ID_BASE;
-          }
-          else if (index >= 8) {
-            config.id_control = GM6020_CTRL_ID_EXTAND;
-            motors_[index]->num_ = config.id_feedback - GM6020_FB_ID_EXTAND;
-          }
-                break;
-        default:
-          break;
+      RMMotor::ConfigParam config{};
+      uint8_t motor_num = 0;
+      uint8_t motor_index = 0;
+
+      if (param->model != Model::MOTOR_NONE) {
+        config.id_feedback = M3508_M2006_FB_ID_BASE + index;
+        switch (param->model) {
+          case Model::MOTOR_M2006:
+          case Model::MOTOR_M3508:
+            if (index <= 3) {
+              config.id_control = M3508_M2006_CTRL_ID_BASE;
+              motor_num = config.id_feedback - M3508_M2006_FB_ID_BASE;
+              motor_index = 0;
+              ASSERT(config.id_feedback > 0x200 && config.id_feedback <= 0x204);
+            } else if (index >= 4 && index <= 7) {
+              config.id_control = M3508_M2006_CTRL_ID_EXTAND;
+              motor_num = config.id_feedback - M3508_M2006_FB_ID_EXTAND;
+              motor_index = 1;
+              ASSERT(config.id_feedback > 0x204 && config.id_feedback <= 0x208);
+            } else {
+              ASSERT(false);
+            }
+            break;
+          case Model::MOTOR_GM6020:
+            if (index >= 4 && index <= 7) {
+              config.id_control = GM6020_CTRL_ID_BASE;
+              motor_num = config.id_feedback - GM6020_FB_ID_BASE;
+              motor_index = 2;
+              ASSERT(config.id_feedback > 0x204 && config.id_feedback <= 0x208);
+            } else if (index >= 8) {
+              config.id_control = GM6020_CTRL_ID_EXTAND;
+              motor_num = config.id_feedback - GM6020_FB_ID_EXTAND;
+              motor_index = 3;
+              ASSERT(config.id_feedback > 0x208 && config.id_feedback <= 0x20B);
+            } else {
+              ASSERT(false);
+            }
+            break;
+          default:
+            break;
+        }
       }
-      switch (config.id_control) {
-        case M3508_M2006_CTRL_ID_BASE:
-          motors_[index]->index_ = 0;
-          ASSERT(config.id_feedback > 0x200 && config.id_feedback <= 0x204);
-          break;
-        case M3508_M2006_CTRL_ID_EXTAND:
-          motors_[index]->index_ = 1;
-          ASSERT(config.id_feedback > 0x204 && config.id_feedback <= 0x208);
-          break;
-        case GM6020_CTRL_ID_BASE:
-          motors_[index]->index_ = 2;
-          ASSERT(config.id_feedback > 0x204 && config.id_feedback <= 0x208);
-          break;
-        case GM6020_CTRL_ID_EXTAND:
-          motors_[index]->index_ = 3;
-          ASSERT(config.id_feedback > 0x208 && config.id_feedback <= 0x20B);
-          break;
-        default:
-          ASSERT(false);
+
+      motors_[index] = new RMMotor(this, *param, config);
+
+      if (param->model != Model::MOTOR_NONE) {
+        motors_[index]->index_ = motor_index;
+        motors_[index]->num_ = motor_num;
       }
+
       index++;
     }
 
