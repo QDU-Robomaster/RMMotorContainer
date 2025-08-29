@@ -49,8 +49,8 @@ depends: []
 
 /* RMMotor id */
 /* id     feedback id     control id */
-/* 1-4    0x205 to 0x208  0x1ff */
-/* 5-6    0x209 to 0x20B  0x2ff */
+/* 1-4    0x205 to 0x208  0x1fe */
+/* 5-6    0x209 to 0x20B  0x2fe */
 #define GM6020_FB_ID_BASE (0x205)
 #define GM6020_FB_ID_EXTAND (0x209)
 #define GM6020_CTRL_ID_BASE (0x1fe)
@@ -65,7 +65,7 @@ depends: []
 #define M3508_M2006_CTRL_ID_EXTAND (0x1ff)
 #define M3508_M2006_ID_SETTING_ID (0x700)
 
-#define MOTOR_CTRL_ID_NUMBER (3)
+#define MOTOR_CTRL_ID_NUMBER (4)
 
 #define GM6020_MAX_ABS_LSB (16384)
 #define M3508_MAX_ABS_LSB (16384)
@@ -217,7 +217,7 @@ public:
       if (param_.reverse) {
         return -this->feedback_.rotor_rotation_speed;
       } else {
-        return this->feedback_.rotor_abs_angle;
+        return this->feedback_.rotor_rotation_speed;
       }
     }
 
@@ -307,9 +307,10 @@ public:
      * @return bool 总是返回 true
      */
     bool SendData() {
-      LibXR::CAN::ClassicPack tx_buff;
+      LibXR::CAN::ClassicPack tx_buff{};
 
       tx_buff.id = this->config_param_.id_control;
+      tx_buff.type = LibXR::CAN::Type::STANDARD;
 
       memcpy(tx_buff.data, motor_tx_buff_[this->index_],
              sizeof(tx_buff.data));
@@ -362,7 +363,7 @@ public:
    * @param param_9 电机9的参数
    * @param param_10 电机10的参数
    */
-  RMMotorContainer(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
+ RMMotorContainer(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
                    Param param_0 = {Model::MOTOR_NONE, false},
                    Param param_1 = {Model::MOTOR_NONE, false},
                    Param param_2 = {Model::MOTOR_NONE, false},
@@ -380,11 +381,11 @@ public:
     for (const auto param : std::initializer_list<Param*>{
              &param_0, &param_1, &param_2, &param_3, &param_4, &param_5,
              &param_6, &param_7, &param_8, &param_9, &param_10}) {
-      RMMotor::ConfigParam config{};
-      uint8_t motor_num = 0;
-      uint8_t motor_index = 0;
-
       if (param->model != Model::MOTOR_NONE) {
+        RMMotor::ConfigParam config{};
+        uint8_t motor_num = 0;
+        uint8_t motor_index = 0;
+
         switch (param->model) {
           case Model::MOTOR_M2006:
           case Model::MOTOR_M3508:
@@ -431,13 +432,17 @@ public:
         }
 
         motor_tx_map_[motor_index] |= (1 << motor_num);
-      }
 
-      motors_[index] = new RMMotor(this, *param, config);
-
-      if (param->model != Model::MOTOR_NONE) {
+        motors_[index] = new RMMotor(this, *param, config);
         motors_[index]->index_ = motor_index;
         motors_[index]->num_ = motor_num;
+
+      } else {
+        // 如果电机模型为 NONE, 使用默认空配置创建
+        RMMotor::ConfigParam empty_config{};
+        motors_[index] = new RMMotor(this, *param, empty_config);
+        motors_[index]->index_ = 0; // 赋予明确的默认值
+        motors_[index]->num_ = 0;   // 赋予明确的默认值
       }
 
       index++;
