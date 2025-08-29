@@ -80,15 +80,13 @@ depends: []
 #define MOTOR_CUR_RES (16384) /* 电机转矩电流分辨率 */
 
 
-
 class RMMotorContainer : public LibXR::Application {
 public:
-
   static inline uint8_t motor_tx_buff_[MOTOR_CTRL_ID_NUMBER][8];
 
- static inline uint8_t motor_tx_flag_[MOTOR_CTRL_ID_NUMBER];
+  static inline uint8_t motor_tx_flag_[MOTOR_CTRL_ID_NUMBER];
 
- static inline uint8_t motor_tx_map_[MOTOR_CTRL_ID_NUMBER];
+  static inline uint8_t motor_tx_map_[MOTOR_CTRL_ID_NUMBER];
 
   /**
    * @brief 电机型号
@@ -110,11 +108,11 @@ public:
 
   class RMMotor {
   public:
-     struct ConfigParam {
+    struct ConfigParam {
       uint32_t id_feedback;
       uint32_t id_control;
-
     };
+
     struct Feedback {
       float rotor_abs_angle = 0.0f;
       float rotor_rotation_speed = 0.0f;
@@ -128,17 +126,20 @@ public:
      * @param param 电机的基本参数（型号、是否反转）
      * @param config 电机的配置参数（反馈ID、控制ID）
      */
-    RMMotor(RMMotorContainer* container,const Param& param, const ConfigParam& config)
-      : param_(param),config_param_(config),container_(container) {
+    RMMotor(RMMotorContainer* container, const Param& param,
+            const ConfigParam& config)
+      : param_(param), config_param_(config), container_(container) {
     }
 
     /**
      * @brief 解码来自CAN总线的电机反馈数据包
      * @param pack 包含电机反馈数据的CAN数据包
      */
-    void Decode(LibXR::CAN::ClassicPack & pack) {
-      uint16_t raw_angle = static_cast<uint16_t>((pack.data[0] << 8) | pack.data[1]);
-      int16_t raw_current = static_cast<int16_t>((pack.data[4] << 8) | pack.data[5]);
+    void Decode(LibXR::CAN::ClassicPack& pack) {
+      uint16_t raw_angle = static_cast<uint16_t>(
+        (pack.data[0] << 8) | pack.data[1]);
+      int16_t raw_current = static_cast<int16_t>(
+        (pack.data[4] << 8) | pack.data[5]);
 
       this->feedback_.rotor_abs_angle =
           LibXR::CycleValue<float>(raw_angle) / MOTOR_ENC_RES * M_2PI;
@@ -160,7 +161,7 @@ public:
         if ((pack.id == config_param_.id_feedback) &&
             (Model::MOTOR_NONE != this->param_.model)) {
           this->Decode(pack);
-            }
+        }
       }
 
       return true;
@@ -191,6 +192,7 @@ public:
           return 0.0f;
       }
     }
+
     /**
      * @brief 根据电机型号获取电流控制指令的转换系数 (LSB)
      * @return float 返回对应型号的LSB值，若型号未知则返回0.0f
@@ -235,10 +237,10 @@ public:
      *          当同一控制ID下的所有电机都更新指令后，触发CAN报文发送。
      * @param out 归一化的电机输出值，范围 [-1.0, 1.0]
      */
-    void  CurrentControl(float out) {
+    void CurrentControl(float out) {
       if (this->feedback_.temp > 75.0f) {
         out = 0.0f;
-        XR_LOG_WARN("motor %d high temperature detected",index_);
+        XR_LOG_WARN("motor %d high temperature detected", index_);
       }
 
       out = std::clamp(out, -1.0f, 1.0f);
@@ -260,14 +262,14 @@ public:
         if (((~motor_tx_flag_[this->index_]) &
              (motor_tx_map_[this->index_])) == 0) {
           this->SendData();
-             }
+        }
       }
     }
 
     void TorqueControl(float out) {
       if (this->feedback_.temp > 75.0f) {
         out = 0.0f;
-        XR_LOG_WARN("motor %d high temperature detected",index_);
+        XR_LOG_WARN("motor %d high temperature detected", index_);
       }
 
       float kt = this->GetTorque();
@@ -275,7 +277,7 @@ public:
       float lsb = this->GetLSB();
 
       float torque = out / kt;
-      float out_ = torque/max_current;
+      float out_ = torque / max_current;
 
       out = std::clamp(out_, -1.0f, 1.0f);
       if (param_.reverse) {
@@ -295,7 +297,7 @@ public:
         if (((~motor_tx_flag_[this->index_]) &
              (motor_tx_map_[this->index_])) == 0) {
           this->SendData();
-             }
+        }
       }
     }
 
@@ -372,9 +374,8 @@ public:
                    Param param_8 = {Model::MOTOR_NONE, false},
                    Param param_9 = {Model::MOTOR_NONE, false},
                    Param param_10 = {Model::MOTOR_NONE, false})
-    : motors_(new RMMotor*[11]),
-  can_(hw.template FindOrExit<LibXR::CAN>({"can1"}))
-       {
+    : can_(hw.template FindOrExit<LibXR::CAN>({"can1"})) {
+    memset(motor_tx_map_, 0, sizeof(motor_tx_map_));
     size_t index = 0;
     for (const auto param : std::initializer_list<Param*>{
              &param_0, &param_1, &param_2, &param_3, &param_4, &param_5,
@@ -384,42 +385,52 @@ public:
       uint8_t motor_index = 0;
 
       if (param->model != Model::MOTOR_NONE) {
-        config.id_feedback = M3508_M2006_FB_ID_BASE + index;
         switch (param->model) {
           case Model::MOTOR_M2006:
           case Model::MOTOR_M3508:
             if (index <= 3) {
               config.id_control = M3508_M2006_CTRL_ID_BASE;
-              motor_num = config.id_feedback - M3508_M2006_FB_ID_BASE;
-              motor_index = 0;
-              ASSERT(config.id_feedback > 0x200 && config.id_feedback <= 0x204);
+              config.id_feedback = M3508_M2006_FB_ID_BASE + index;
             } else if (index >= 4 && index <= 7) {
               config.id_control = M3508_M2006_CTRL_ID_EXTAND;
-              motor_num = config.id_feedback - M3508_M2006_FB_ID_EXTAND;
-              motor_index = 1;
-              ASSERT(config.id_feedback > 0x204 && config.id_feedback <= 0x208);
-            } else {
-              ASSERT(false);
+              config.id_feedback = M3508_M2006_FB_ID_EXTAND + (index - 4);
             }
             break;
           case Model::MOTOR_GM6020:
             if (index >= 4 && index <= 7) {
               config.id_control = GM6020_CTRL_ID_BASE;
-              motor_num = config.id_feedback - GM6020_FB_ID_BASE;
-              motor_index = 2;
-              ASSERT(config.id_feedback > 0x204 && config.id_feedback <= 0x208);
+              config.id_feedback = GM6020_FB_ID_BASE + (index - 4);
             } else if (index >= 8) {
               config.id_control = GM6020_CTRL_ID_EXTAND;
-              motor_num = config.id_feedback - GM6020_FB_ID_EXTAND;
-              motor_index = 3;
-              ASSERT(config.id_feedback > 0x208 && config.id_feedback <= 0x20B);
-            } else {
-              ASSERT(false);
+              config.id_feedback = GM6020_FB_ID_EXTAND + (index - 8);
             }
             break;
           default:
             break;
         }
+
+        switch (config.id_control) {
+          case M3508_M2006_CTRL_ID_BASE:
+            motor_index = 0;
+            motor_num = config.id_feedback - M3508_M2006_FB_ID_BASE;
+            break;
+          case M3508_M2006_CTRL_ID_EXTAND:
+            motor_index = 1;
+            motor_num = config.id_feedback - M3508_M2006_FB_ID_EXTAND;
+            break;
+          case GM6020_CTRL_ID_BASE:
+            motor_index = 2;
+            motor_num = config.id_feedback - GM6020_FB_ID_BASE;
+            break;
+          case GM6020_CTRL_ID_EXTAND:
+            motor_index = 3;
+            motor_num = config.id_feedback - GM6020_FB_ID_EXTAND;
+            break;
+          default:
+            break;
+        }
+
+        motor_tx_map_[motor_index] |= (1 << motor_num);
       }
 
       motors_[index] = new RMMotor(this, *param, config);
@@ -433,6 +444,19 @@ public:
     }
 
     motor_count_ = index;
+    auto rx_callback = LibXR::CAN::Callback::Create(
+        [](bool in_isr, RMMotorContainer* self,
+           const LibXR::CAN::ClassicPack& pack) {
+          RxCallback(in_isr, self, pack);
+        }, this);
+
+    can_->Register(rx_callback, LibXR::CAN::Type::STANDARD,
+                   LibXR::CAN::FilterMode::ID_RANGE,
+                   M3508_M2006_FB_ID_BASE, M3508_M2006_FB_ID_EXTAND + 3);
+
+    can_->Register(rx_callback, LibXR::CAN::Type::STANDARD,
+                   LibXR::CAN::FilterMode::ID_RANGE,
+                   GM6020_FB_ID_BASE, GM6020_FB_ID_EXTAND + 2);
   }
 
   /**
@@ -468,7 +492,7 @@ public:
   }
 
 private:
-  RMMotor** motors_ = nullptr;
+  RMMotor* motors_[11] = {};
   size_t motor_count_ = 0;
   LibXR::CAN* can_;
 
