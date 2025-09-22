@@ -485,6 +485,7 @@ public:
    */
   static void RxCallback(bool in_isr, RMMotorContainer* self,
                          const LibXR::CAN::ClassicPack& pack) {
+   UNUSED(in_isr);
     while (self->recv_.Push(pack) != ErrorCode::OK) {
       self->recv_.Pop(); // 如果队列满了，尝试弹出一个包
     }
